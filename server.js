@@ -1,10 +1,13 @@
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
 
 // Database connection
 const pool = new Pool({
@@ -49,6 +52,24 @@ async function createTables() {
   }
 }
 
+// Authentication middleware
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid token' });
+    }
+    req.user = user;
+    next();
+  });
+}
+
 // Basic Routes
 app.get('/', (req, res) => {
   res.json({ message: 'DheeCuit API is running!' });
@@ -71,128 +92,56 @@ app.get('/test-db', async (req, res) => {
   }
 });
 
-// RECIPE ENDPOINTS
+// USER AUTHENTICATION ENDPOINTS
 
-// Get all recipes
-app.get('/recipes', async (req, res) => {
+// Register new user
+app.post('/auth/register', async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT id, title, ingredients, instructions, prep_time, cook_time, servings, created_at FROM recipes ORDER BY created_at DESC'
-    );
-    res.json({
-      success: true,
-      count: result.rows.length,
-      recipes: result.rows
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to fetch recipes' });
-  }
-});
+    const { username, email, password } = req.body;
 
-// Get a specific recipe by ID
-app.get('/recipes/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await pool.query(
-      'SELECT id, title, ingredients, instructions, prep_time, cook_time, servings, created_at FROM recipes WHERE id = $1',
-      [id]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Recipe not found' });
+    // Validation
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: 'Username, email, and password are required' });
     }
-    
-    res.json({
-      success: true,
-      recipe: result.rows[0]
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to fetch recipe' });
-  }
-});
 
-// Create a new recipe
-app.post('/recipes', async (req, res) => {
-  try {
-    const { title, ingredients, instructions, prep_time, cook_time, servings } = req.body;
-    
-    // Basic validation
-    if (!title || !ingredients || !instructions) {
-      return res.status(400).json({ 
-        error: 'Title, ingredients, and instructions are required' 
-      });
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
-    
-    const result = await pool.query(
-      'INSERT INTO recipes (title, ingredients, instructions, prep_time, cook_time, servings) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [title, ingredients, instructions, prep_time || null, cook_time || null, servings || null]
+
+    // Check if user already exists
+    const existingUser = await pool.query(
+      'SELECT id FROM users WHERE username = $1 OR email = $2',
+      [username, email]
     );
-    
+
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({ error: 'Username or email already exists' });
+    }
+
+    // Hash password
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+
+    // Create user
+    const result = await pool.query(
+      'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id, username, email, created_at',
+      [username, email, passwordHash]
+    );
+
+    // Create JWT token
+    const token = jwt.sign(
+      { userId: result.rows[0].id, username: result.rows[0].username },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
     res.status(201).json({
       success: true,
-      message: 'Recipe created successfully',
-      recipe: result.rows[0]
+      message: 'User registered successfully',
+      user: result.rows[0],
+      token: token
     });
+
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to create recipe' });
-  }
-});
-
-// Update a recipe
-app.put('/recipes/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { title, ingredients, instructions, prep_time, cook_time, servings } = req.body;
-    
-    // Check if recipe exists
-    const checkRecipe = await pool.query('SELECT id FROM recipes WHERE id = $1', [id]);
-    if (checkRecipe.rows.length === 0) {
-      return res.status(404).json({ error: 'Recipe not found' });
-    }
-    
-    const result = await pool.query(
-      'UPDATE recipes SET title = $1, ingredients = $2, instructions = $3, prep_time = $4, cook_time = $5, servings = $6 WHERE id = $7 RETURNING *',
-      [title, ingredients, instructions, prep_time, cook_time, servings, id]
-    );
-    
-    res.json({
-      success: true,
-      message: 'Recipe updated successfully',
-      recipe: result.rows[0]
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to update recipe' });
-  }
-});
-
-// Delete a recipe
-app.delete('/recipes/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const result = await pool.query('DELETE FROM recipes WHERE id = $1 RETURNING id', [id]);
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Recipe not found' });
-    }
-    
-    res.json({
-      success: true,
-      message: 'Recipe deleted successfully'
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to delete recipe' });
-  }
-});
-
-// Initialize database and start server
-createTables().then(() => {
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-  });
-});
+    res.status(500).json({ error: 'Failed to reg
