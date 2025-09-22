@@ -249,7 +249,7 @@ app.get('/recipes/:id', async (req, res) => {
 });
 
 // Create a new recipe (requires authentication)
-app.post('/recipes', authenticateToken, async (req, res) => {
+app.post('/recipes', async (req, res) => {
   try {
     const { title, ingredients, instructions, prep_time, cook_time, servings } = req.body;
     
@@ -262,7 +262,7 @@ app.post('/recipes', authenticateToken, async (req, res) => {
     
     const result = await pool.query(
       'INSERT INTO recipes (user_id, title, ingredients, instructions, prep_time, cook_time, servings) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [req.user.userId, title, ingredients, instructions, prep_time || null, cook_time || null, servings || null]
+      [null, title, ingredients, instructions, prep_time || null, cook_time || null, servings || null]
     );
     
     res.status(201).json({
