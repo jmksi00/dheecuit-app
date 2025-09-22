@@ -309,15 +309,12 @@ app.put('/recipes/:id', authenticateToken, async (req, res) => {
 });
 
 // Delete a recipe (requires authentication and ownership)
-app.delete('/recipes/:id', authenticateToken, async (req, res) => {
+app.delete('/recipes/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
     // Check if recipe exists and user owns it
     const checkRecipe = await pool.query('SELECT user_id FROM recipes WHERE id = $1', [id]);
-    if (checkRecipe.rows.length === 0) {
-      return res.status(404).json({ error: 'Recipe not found' });
-    }
     
     if (checkRecipe.rows[0].user_id !== req.user.userId) {
       return res.status(403).json({ error: 'You can only delete your own recipes' });
