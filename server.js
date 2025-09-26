@@ -9,10 +9,10 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// PostgreSQL connection using Railway's DATABASE_URL
+// PostgreSQL connection using your Railway database
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  connectionString: 'postgresql://postgres:UgFAvwymCstgRBLfbrTwCjbcAyKKVEcI@postgres.railway.internal:5432/railway',
+  ssl: false // Railway internal connections don't need SSL
 });
 
 // Create users table if it doesn't exist
@@ -80,7 +80,7 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
-    const token = jwt.sign({ userId: user.id }, 'your-secret-key', { expiresIn: '24h' });
+    const token = jwt.sign({ userId: user.id }, 'dheecuit-secret-key-2024', { expiresIn: '24h' });
     
     res.json({ 
       success: true, 
@@ -104,7 +104,7 @@ app.get('/api/user', async (req, res) => {
       return res.status(401).json({ error: 'No token provided' });
     }
     
-    const decoded = jwt.verify(token, 'your-secret-key');
+    const decoded = jwt.verify(token, 'dheecuit-secret-key-2024');
     
     const result = await pool.query(
       'SELECT id, first_name, last_name, email FROM users WHERE id = $1',
