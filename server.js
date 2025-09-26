@@ -38,6 +38,7 @@ const initDB = async () => {
 initDB();
 
 // POST /api/register
+// POST /api/register
 app.post('/api/register', async (req, res) => {
   try {
     const { firstName, lastName, email, password } = req.body;
