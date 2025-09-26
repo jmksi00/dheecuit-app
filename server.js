@@ -38,7 +38,6 @@ const initDB = async () => {
 initDB();
 
 // POST /api/register
-// POST /api/register
 app.post('/api/register', async (req, res) => {
   try {
     const { firstName, lastName, email, password } = req.body;
@@ -51,14 +50,19 @@ app.post('/api/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     
     const result = await pool.query(
-      'INSERT INTO users (firstName, lastName, email, password_hash) VALUES ($1, $2, $3, $4) RETURNING id, firstName, lastName, email',
+      'INSERT INTO users (first_name, last_name, email, password_hash) VALUES ($1, $2, $3, $4) RETURNING id, first_name, last_name, email',
       [firstName, lastName, email, hashedPassword]
     );
     
     res.json({ 
       success: true, 
       message: 'User created successfully',
-      user: result.rows[0]
+      user: {
+        id: result.rows[0].id,
+        first_name: result.rows[0].first_name,
+        last_name: result.rows[0].last_name,
+        email: result.rows[0].email
+      }
     });
   } catch (error) {
     res.status(400).json({ error: error.message });
