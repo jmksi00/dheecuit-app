@@ -9,7 +9,7 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// PostgreSQL connection using your Railway database sure
+// PostgreSQL connection using your Railway database
 const pool = new Pool({
   connectionString: 'postgresql://postgres:UgFAvwymCstgRBLfbrTwCjbcAyKKVEcI@postgres.railway.internal:5432/railway',
   ssl: false // Railway internal connections don't need SSL
@@ -18,18 +18,19 @@ const pool = new Pool({
 // Create users table if it doesn't exist
 const initDB = async () => {
   try {
-    // First, let's see what columns exist
+    // Drop and recreate table to fix column name mismatch
+    await pool.query(`DROP TABLE IF EXISTS users CASCADE`);
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
+      CREATE TABLE users (
         id SERIAL PRIMARY KEY,
-        firstName VARCHAR(100) NOT NULL,
-        lastName VARCHAR(100) NOT NULL,
+        first_name VARCHAR(100) NOT NULL,
+        last_name VARCHAR(100) NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log('Database initialized');
+    console.log('Database table created with correct column names');
   } catch (error) {
     console.error('Database init error:', error);
   }
