@@ -9,7 +9,7 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// PostgreSQL connection using your Railway database
+// PostgreSQL connection using your Railway database sure
 const pool = new Pool({
   connectionString: 'postgresql://postgres:UgFAvwymCstgRBLfbrTwCjbcAyKKVEcI@postgres.railway.internal:5432/railway',
   ssl: false // Railway internal connections don't need SSL
